@@ -110,9 +110,25 @@ or step by step (inside the container, in `/foss/designs/highsigma_mc`):
 | 3 | `python3 scripts/03_highsigma_is.py` | ~2 min | `results/03_highsigma_is.json`, IS samples, GP |
 | 4 | `python3 scripts/04_plots.py` | 10 s | `results/fig*.png` |
 | 5 | `python3 scripts/05_table.py` | 1 s | `results/results_table.md` |
+| 6 | `python3 scripts/06_p1_designs.py` | ~3 min | `results/p1_designs.{md,json}` |
 
 Code: [`hsmc/ota_mc.py`](hsmc/ota_mc.py) (mismatch model, batched netlist, parallel runner, specs)
 and [`scripts/`](scripts). Concepts and interview Q&A: [`NOTES.md`](NOTES.md).
+
+## Applied to the LLM agent's designs
+
+`python3 scripts/06_p1_designs.py` runs the offset analysis on the 8 final designs from
+[LLM_Analog_Sizing](https://github.com/Pavan072006/LLM_Analog_Sizing) (4000 MC sims each), with an offset spec of |Vos| ≤ 10 mV, then the
+full ML-guided importance sampling on the worst one. Table: [results/p1_designs.md](results/p1_designs.md).
+
+* The optimiser never saw an offset spec. Five designs still reach > 5σ offset yield, S5 only 2.9σ, and
+  **S1 and S7 fail on 10–13 % of chips** (1.1–1.3σ).
+* The cause is visible in the mismatch numbers: minimising power pushed the PMOS load very small
+  (S7: σVth of M3 = 14.5 mV vs 0.9 mV for the input pair), so the load dominates the offset.
+* These OTAs also have a 2–6 mV systematic offset (mean), so a Gaussian estimate has to include the mean.
+  With it, Gaussian, MC and importance sampling agree; on S7 IS matches the Gaussian within 2 % at 3–4σ
+  and gives 1.5× higher P(fail) at 6σ (2.8e-8 vs 1.9e-8).
+* Next step: add offset as a constraint in the sizing loop, using IS for the yield check.
 
 ## Limitations (honest)
 

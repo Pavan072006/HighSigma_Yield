@@ -5,3 +5,5 @@ work/
 *.log
 # 30 MB raw brute-force samples; regenerate with run_all.sh
 results/02_brute_mc.npz
+results/p1/is_*/*.npz
+results/p1/is_*/*.pkl

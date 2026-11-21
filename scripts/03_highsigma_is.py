@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Step 3 - ML-guided importance sampling for 4-6 sigma failure probabilities"""
 import json
+import os
 import pathlib
 import sys
 import time
@@ -13,6 +14,8 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel, DotProduct, WhiteKernel
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+OUT = pathlib.Path(os.environ.get("HSMC_OUT", ROOT / "results"))
+OUT.mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(ROOT))
 from hsmc.ota_mc import DIM, SPECS_MV, VAR_NAMES, fails, simulate  # noqa: E402
 
@@ -120,7 +123,7 @@ for k, s in SPECS_MV.items():
         reps.append({"p": p, "ci95": [p - 1.96 * se, p + 1.96 * se], "rel_ci": 1.96 * se / p if p else None,
                      "n_fail": int(f.sum()), "run_p": run.tolist(), "run_se": run_se.tolist()})
         if rep == 0:
-            np.savez_compressed(ROOT / "results" / f"03_is_samples_{k}sig.npz", X=X, vos=v, w=w, f=f)
+            np.savez_compressed(OUT / f"03_is_samples_{k}sig.npz", X=X, vos=v, w=w, f=f)
     ps = np.array([q["p"] for q in reps])
     # pooled estimate over all repetitions (N_REP*N_IS sims)
     p_pool = float(ps.mean()); se_pool = float(ps.std(ddof=1) / np.sqrt(N_REP))
@@ -143,8 +146,8 @@ out = {"sims": sims, "seconds": time.time() - t0, "surrogate_rmse_mV": rmse,
        "classifier_accuracy": cls_acc, "kernel": str(gp.kernel_),
        "mpfp_direction_6sig": dict(zip(VAR_NAMES, d6.round(4).tolist())),
        "N_TRAIN": N_TRAIN, "TRAIN_SCALE": TRAIN_SCALE, "N_IS": N_IS, "N_REP": N_REP, "specs": results}
-(ROOT / "results" / "03_highsigma_is.json").write_text(json.dumps(out, indent=1))
-np.savez_compressed(ROOT / "results" / "03_train.npz", Xtr=Xtr, ytr=ytr, Xv=Xv, yv=yv)
+(OUT / "03_highsigma_is.json").write_text(json.dumps(out, indent=1))
+np.savez_compressed(OUT / "03_train.npz", Xtr=Xtr, ytr=ytr, Xv=Xv, yv=yv)
 import pickle  # noqa: E402
-pickle.dump(gp, open(ROOT / "results" / "03_gp.pkl", "wb"))
+pickle.dump(gp, open(OUT / "03_gp.pkl", "wb"))
 print("sims used:", sims, f"total {sum(sims.values())}, {time.time()-t0:.0f}s")

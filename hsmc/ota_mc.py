@@ -1,3 +1,4 @@
+import json
 import math
 import os
 import pathlib
@@ -18,6 +19,8 @@ SIZING = {
     "W5": 11.165e-6, "L5": 1.0e-6,
     "Itail": 41.888e-6,
 }
+if os.environ.get("HSMC_SIZING"):
+    SIZING = json.loads(pathlib.Path(os.environ["HSMC_SIZING"]).read_text())
 VDD, VCM = 3.3, 1.65
 MAX_FINGER_W = 20e-6
 DIFF_EXT = 0.48e-6
@@ -41,6 +44,8 @@ DIM = 2 * NDEV
 VAR_NAMES = [f"Vth_{d[0]}" for d in DEVICES] + [f"beta_{d[0]}" for d in DEVICES]
 
 SPECS_MV = {3: 18.1, 4: 22.6, 5: 27.0, 6: 31.5}
+if os.environ.get("HSMC_SPECS"):
+    SPECS_MV = {int(k): v for k, v in json.loads(os.environ["HSMC_SPECS"]).items()}
 
 
 def fails(vos, spec_mv):
