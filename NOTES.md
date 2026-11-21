@@ -141,11 +141,16 @@ x*, so it works in hundreds of dims if the boundary is near-linear. In practice 
 insensitive variables first (our tail transistors). For truly high-dimensional problems (SRAM
 arrays), people use scaled-sigma sampling or subset simulation.
 
-**Q: Gaussian extrapolation gives the same answer, so why bother?** Here the offset is almost
-linear in Vth, so it's nearly Gaussian and extrapolation works. Many real metrics are not:
-SRAM read/write margins, comparator metastability, anything with a saturating or min/max
-behaviour. There the tail is heavier or lighter than Gaussian, and extrapolating from 3 sigma can be
-wrong by orders of magnitude. IS with real SPICE samples measures the actual tail.
+**Q: Gaussian extrapolation gives the same answer, so why bother?** For the OTA offset, yes, because it is
+almost linear. For the SRAM read margin, no. Specs set from a Gaussian fit as "6σ" fail 490× more often
+than predicted (real 4.9σ), and brute force confirms the gap at 3–5σ. The reason is that SNM is the
+minimum of two lobes. Each lobe is near-Gaussian, but the minimum has a squeezed spread and two ways
+to fail, so its tail is much heavier than a Gaussian fitted to it.
+
+**Q: What is read SNM?** During a read, both bit lines and the word line are high, and the pass-gate
+fights the pull-down on the side storing 0. Plot both half-cells' transfer curves (one mirrored) to get
+a "butterfly". The side of the largest square inside each lobe is how much noise the cell tolerates
+before flipping. The cell's SNM is the smaller lobe. A weak pull-down or strong pass-gate shrinks it.
 
 **Q: How do you choose N_IS?** Run until the relative CI half-width is below a target (e.g. 10%).
 Here we measured ~1.4k (3σ) to ~2.9k (6σ) IS sims for ±10%. The cost grows only slowly with

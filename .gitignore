@@ -7,3 +7,4 @@ work/
 results/02_brute_mc.npz
 results/p1/is_*/*.npz
 results/p1/is_*/*.pkl
+results/07_sram_mc.npz

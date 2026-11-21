@@ -17,6 +17,11 @@ from **~5,900 SPICE sims**. Brute force would need **~2.6e11** sims for ±10%. W
 still see failures (3σ, 4σ and 5σ, using 1e7 samples in 77 min), the IS estimate falls inside its
 confidence interval.
 
+**Second case, where the Gaussian shortcut fails:** a 6T SRAM cell's read noise margin. Specs set
+from a Gaussian fit as "6σ" are really **4.9σ**, with **490× more failures** than the fit predicts. The same
+IS method measures it with ~5k sims per spec, matching 1e6 brute-force samples at 3σ, 4σ and 5σ
+(see [below](#second-metric-sram-read-margin-non-gaussian)).
+
 Part of a portfolio. The design under test is the gm/Id hand design from
 [LLM_Analog_Sizing](https://github.com/Pavan072006/LLM_Analog_Sizing) (project 1: LLM-agent OTA sizing + layout).
 
@@ -111,9 +116,12 @@ or step by step (inside the container, in `/foss/designs/highsigma_mc`):
 | 4 | `python3 scripts/04_plots.py` | 10 s | `results/fig*.png` |
 | 5 | `python3 scripts/05_table.py` | 1 s | `results/results_table.md` |
 | 6 | `python3 scripts/06_p1_designs.py` | ~3 min | `results/p1_designs.{md,json}` |
+| 7 | `python3 scripts/07_sram_mc.py 1000000` | ~38 min | SRAM brute-force MC, `results/07_sram_mc.json` |
+| 8 | `python3 scripts/08_sram_is.py` | ~5 min | SRAM IS, `results/08_sram_is.json` |
+| 9 | `python3 scripts/09_sram_report.py` | 5 s | `results/fig5_sram_snm.png`, `results/sram_table.md` |
 
 Code: [`hsmc/ota_mc.py`](hsmc/ota_mc.py) (mismatch model, batched netlist, parallel runner, specs)
-and [`scripts/`](scripts). Concepts and interview Q&A: [`NOTES.md`](NOTES.md).
+[`hsmc/sram_snm.py`](hsmc/sram_snm.py) (6T SRAM read SNM) and [`scripts/`](scripts). Concepts and interview Q&A: [`NOTES.md`](NOTES.md).
 
 ## Applied to the LLM agent's designs
 
@@ -130,12 +138,47 @@ full ML-guided importance sampling on the worst one. Table: [results/p1_designs.
   and gives 1.5× higher P(fail) at 6σ (2.8e-8 vs 1.9e-8).
 * Next step: add offset as a constraint in the sizing loop, using IS for the yield check.
 
+## Second metric: SRAM read margin (non-Gaussian)
+
+The offset above is nearly Gaussian, so a simple fit would have worked. The **read static noise margin
+(SNM)** of a 6T SRAM cell is the classic case where it does not. In a read, both bit lines and the word
+line are high. SNM is the side of the largest square that fits inside each lobe of the "butterfly" curve
+(the two half-cells' transfer curves). The cell's SNM is the **smaller** of the two lobes.
+
+* **Cell:** GF180 3.3 V devices, L = 0.28 µm, pull-down 0.8 µm, pass-gate 0.4 µm, pull-up 0.3 µm.
+  12 mismatch variables (Vth and β of 6 transistors), σVth 15–21 mV. Nominal SNM 369 mV.
+* **Simulation:** one DC sweep per half-cell, 200 cells per ngspice run. SNM is computed with the rotated-axis
+  method (checked against a brute-force largest-square search). ~2.3 ms per cell on 12 cores.
+* **Specs, the usual way:** fit a Gaussian to a 10k-sample pilot MC (359.0 ± 9.8 mV) and set
+  spec_k = mean − k·std. Fail if SNM < spec.
+* **IS:** one GP surrogate per lobe, an MPFP per lobe, and a mixture proposal. Pass/fail always comes from SPICE.
+
+![SRAM SNM](results/fig5_sram_snm.png)
+
+| spec | SNM < | Gaussian fit says | brute-force MC, N=1e6 [95% CI] (fails) | ML-guided IS [95% CI] | real sigma |
+|---|---|---|---|---|---|
+| "3σ" | 329.6 mV | 1.35e-03 | 4.14e-03 [4.0e-03, 4.3e-03] (4137) | 4.08e-03 [3.9e-03, 4.3e-03] | 2.65 |
+| "4σ" | 319.8 mV | 3.17e-05 | 3.70e-04 [3.3e-04, 4.1e-04] (370) | 3.34e-04 [3.1e-04, 3.5e-04] | 3.40 |
+| "5σ" | 310.0 mV | 2.87e-07 | 1.90e-05 [1.2e-05, 3.0e-05] (19) | 1.63e-05 [1.5e-05, 1.8e-05] | 4.15 |
+| "6σ" | 300.1 mV | 9.87e-10 | < 3.8e-06 (0 fails) | 4.83e-07 [4.6e-07, 5.1e-07] | 4.90 |
+
+* **The Gaussian fit is wrong by 3× at 3σ and 490× at 6σ.** A designer who trusted it would ship a
+  cell rated "6σ" that is really 4.9σ. In a 1 Mb array, that means ~0.5 failing cells per chip instead of ~0.001.
+* **Why:** each lobe alone is close to Gaussian (mean 368.5 mV, std 13.6 mV, and FORM per lobe agrees
+  with IS within 6 %). Taking the minimum of two anti-correlated lobes (correlation −0.52) pulls the
+  mean down and squeezes the spread to 9.8 mV, and either lobe can fail. A Gaussian fitted to the
+  minimum therefore has a tail that is far too thin.
+* **What dominates:** at the 6σ MPFP, the pull-down and pass-gate Vth (PD 0.78, PG 0.38, opposite-side
+  PD 0.28). The pull-up hardly matters, as expected for read stability.
+* **Cost:** IS used 20,924 sims for all four specs. Brute force needed 1e6 sims (38 min) to see 19 failures at 5σ.
+  For ±10 % at 6σ it would need ~8e8 sims, which is out of reach.
+* **Honest note:** the per-lobe surrogates use the known structure of SNM (min of two lobes). A single
+  surrogate on SNM itself would have to learn the kink where the lobes swap.
+
 ## Limitations (honest)
 
-* **Near-linear metric.** DC offset depends almost linearly on dVth, so Gaussian extrapolation
-  would have worked too. High-sigma methods earn their keep on non-Gaussian metrics (SRAM read/write
-  margins, comparator decisions, anything with clipping or min/max). The natural next step is to apply
-  the same pipeline to such a metric.
+* **Offset is near-linear.** For the OTA offset, Gaussian extrapolation would have worked too. The SRAM
+  read margin is the non-Gaussian case. Write margin and comparator decisions are not covered yet.
 * **Pre-layout, local mismatch only.** No layout effects (gradients, LOD/WPE), no global process
   variation (you'd repeat the analysis per global corner), DC only, typical corner, 27 °C.
 * **Statistics assumed Gaussian out to 6σ.** The Pelgrom model is characterised by the foundry at
