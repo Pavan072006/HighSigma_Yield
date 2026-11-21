@@ -121,7 +121,7 @@ or step by step (inside the container, in `/foss/designs/highsigma_mc`):
 | 9 | `python3 scripts/09_sram_report.py` | 5 s | `results/fig5_sram_snm.png`, `results/sram_table.md` |
 
 Code: [`hsmc/ota_mc.py`](hsmc/ota_mc.py) (mismatch model, batched netlist, parallel runner, specs)
-[`hsmc/sram_snm.py`](hsmc/sram_snm.py) (6T SRAM read SNM) and [`scripts/`](scripts). Concepts and interview Q&A: [`NOTES.md`](NOTES.md).
+[`hsmc/sram_snm.py`](hsmc/sram_snm.py) (6T SRAM read SNM) and [`scripts/`](scripts).
 
 ## Applied to the LLM agent's designs
 
