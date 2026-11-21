@@ -18,7 +18,7 @@ still see failures (3σ, 4σ and 5σ, using 1e7 samples in 77 min), the IS estim
 confidence interval.
 
 Part of a portfolio. The design under test is the gm/Id hand design from
-[`../analog_agent`](../analog_agent) (project 1: LLM-agent OTA sizing + layout).
+[LLM_Analog_Sizing](https://github.com/Pavan072006/LLM_Analog_Sizing) (project 1: LLM-agent OTA sizing + layout).
 
 ---
 
